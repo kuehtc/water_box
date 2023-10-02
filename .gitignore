@@ -1,0 +1,6 @@
+# telll git to ignore .lammps files
+
+*.lammps
+*.vmd
+*.lammpstrj
+density.dat

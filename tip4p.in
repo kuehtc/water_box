@@ -1,0 +1,61 @@
+variable        lattice equal 3.615  #copper lattice
+variable        tlo equal 300
+variable        thi equal 400
+variable		avo	equal 6.02214e23
+variable		h2o_mass	equal 18.0154
+variable		z2 equal 4.5921						# lattice height for water box
+
+########### Setting up Simulation Box & Environment ###########
+
+units			real
+boundary		p p p
+dimension		3
+atom_style 		full
+pair_style 		lj/cut/tip4p/long 1 2 1 1 0.15 12.0 10.0
+pair_modify		mix arithmetic
+
+bond_style 		zero
+angle_style 	zero
+
+kspace_style 	pppm/tip4p 1.0e-4
+
+region			box block 0 36.15 0 36.15 0 60
+create_box 		2 box bond/types 1 angle/types 1 &
+				extra/bond/per/atom 2 extra/angle/per/atom 1 &
+				extra/special/per/atom 2
+
+############## Create Atoms ###############
+
+molecule h2omol tip4p.txt
+create_atoms 0 random 800 167943 NULL mol h2omol 927183 overlap 2		# H2O
+
+include tip4p.parm
+group H2O type 1 2
+
+thermo 10000
+# minimize 1.0e-4 1.0e-6 100 1000
+
+fix myshake all shake 0.00001 200 0 b 1 a 1 mol h2omol
+
+fix mynpt all npt temp 500 500 100 z 1 1 1000
+
+dump mydmp all atom 1000 dump.lammpstrj
+variable mytemp equal temp
+variable myvol equal vol
+variable myoxy equal count(H2O)/3 # divide by 3 to get the number of molecule, not atom
+variable mydensity equal ${myoxy}*${h2o_mass}/${avo}/1000/v_myvol/1e-30				# in kg/m3
+fix myat3 all ave/time 10 10 100 v_mydensity file density.dat
+thermo_style custom step temp press lz pe ke etotal density cpuremain
+
+timestep 1
+run 20000
+
+unfix mynpt
+fix mynpt all npt temp 500 300 100 z 1 1 1000
+run 100000
+
+unfix mynpt
+fix mynpt all npt temp 300 300 100 z 1 1 1000
+run 150000
+
+write_data tip4p.data
